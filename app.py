@@ -64,7 +64,8 @@ def update_actual(prices):
         pass
 
 def save_prediction(low, high, S0):
-    current_hour = datetime.utcnow().replace(minute=0, second=0, microsecond=0).isoformat()
+    current_time = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+    current_hour = str(current_time)
     
     # Duplicate check for the current hour
     try:
