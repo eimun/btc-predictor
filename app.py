@@ -192,10 +192,16 @@ if not history_df.empty:
     history_df['time'] = history_df['time'].astype(str).str.replace('T', ' ').str[:13] + ':00'
     history_df.drop_duplicates(subset=['time'], keep='last', inplace=True)
     
-    history_df["correct"] = (
-        (history_df["actual"] >= history_df["low"]) &
-        (history_df["actual"] <= history_df["high"])
-    )
+    def get_status(row):
+        if pd.isna(row['actual']):
+            return '⏳'
+        elif row['low'] <= row['actual'] <= row['high']:
+            return '✔️'
+        else:
+            return '❌'
+
+    history_df['Status'] = history_df.apply(get_status, axis=1)
+    history_df = history_df.drop(columns=["correct"], errors="ignore")
     st.dataframe(history_df.tail(10))
 else:
     st.info("No predictions yet")
