@@ -5,6 +5,8 @@ import requests
 from arch import arch_model
 import scipy.stats as stats
 import matplotlib.pyplot as plt
+import json
+from datetime import datetime
 
 st.set_page_config(page_title="BTC Predictor", layout="wide")
 
@@ -32,6 +34,57 @@ def get_data():
 
 df = get_data()
 prices = df["close"]
+
+# -----------------------------
+# PREDICTION HISTORY LOGIC
+# -----------------------------
+def update_actual(prices):
+    try:
+        with open("predictions_history.jsonl", "r") as f:
+            lines = f.readlines()
+
+        updated = []
+        for line in lines:
+            record = json.loads(line)
+
+            if record["actual"] is None:
+                record_time = pd.to_datetime(record["time"])
+                nearest = prices.index.get_indexer([record_time], method='nearest')[0]
+
+                if nearest + 1 < len(prices):
+                    record["actual"] = float(prices.iloc[nearest + 1])
+
+            updated.append(record)
+
+        with open("predictions_history.jsonl", "w") as f:
+            for r in updated:
+                f.write(json.dumps(r) + "\n")
+
+    except:
+        pass
+
+def save_prediction(low, high, S0):
+    record = {
+        "time": datetime.utcnow().isoformat(),
+        "current_price": float(S0),
+        "low": float(low),
+        "high": float(high),
+        "actual": None
+    }
+    with open("predictions_history.jsonl", "a") as f:
+        f.write(json.dumps(record) + "\n")
+
+def load_history():
+    try:
+        with open("predictions_history.jsonl", "r") as f:
+            lines = f.readlines()
+            data = [json.loads(line) for line in lines]
+            return pd.DataFrame(data)
+    except:
+        return pd.DataFrame()
+
+# call this BEFORE saving new prediction
+update_actual(prices)
 
 # -----------------------------
 # MODEL
@@ -64,6 +117,9 @@ def simulate(n_sims=3000):
 S = simulate()
 
 low, high = np.percentile(S, [3.4, 96.6])
+
+# call this
+save_prediction(low, high, S0)
 
 # -----------------------------
 # UI
@@ -108,3 +164,21 @@ ax.legend()
 plt.xticks(rotation=45)
 
 st.pyplot(fig)
+
+st.markdown("---")
+
+# -----------------------------
+# HISTORY
+# -----------------------------
+st.markdown("### 📜 Prediction History")
+
+history_df = load_history()
+
+if not history_df.empty:
+    history_df["correct"] = (
+        (history_df["actual"] >= history_df["low"]) &
+        (history_df["actual"] <= history_df["high"])
+    )
+    st.dataframe(history_df.tail(10))
+else:
+    st.info("No predictions yet")
