@@ -45,24 +45,35 @@ def update_actual(prices):
             lines = f.readlines()
 
         updated = []
+        changed = False
         for line in lines:
             record = json.loads(line)
 
             if record["actual"] is None:
                 row_time = pd.to_datetime(record["time"])
-                # Predictions are validated only after the forecast horizon is reached to avoid data leakage
-                if now >= row_time + pd.Timedelta(hours=1):
-                    if row_time in prices.index:
-                        record["actual"] = float(prices.loc[row_time])
-                    else:
-                        nearest = prices.index.get_indexer([row_time], method='nearest')[0]
-                        record["actual"] = float(prices.iloc[nearest])
+                target_time = row_time + pd.Timedelta(hours=1)
+                # Only verify after the forecast horizon has passed
+                if now >= target_time:
+                    # Try to find the actual price at target_time from Binance data
+                    actual_price = None
+                    # Match by nearest index in the fetched prices
+                    idx = prices.index.get_indexer([target_time], method='nearest')[0]
+                    if idx >= 0 and idx < len(prices):
+                        actual_price = float(prices.iloc[idx])
+                    
+                    if actual_price is None:
+                        # Fallback: use latest available price
+                        actual_price = float(prices.iloc[-1])
+                    
+                    record["actual"] = actual_price
+                    changed = True
 
             updated.append(record)
 
-        with open("predictions_history.jsonl", "w") as f:
-            for r in updated:
-                f.write(json.dumps(r) + "\n")
+        if changed:
+            with open("predictions_history.jsonl", "w") as f:
+                for r in updated:
+                    f.write(json.dumps(r) + "\n")
 
     except:
         pass
