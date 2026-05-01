@@ -189,7 +189,7 @@ history_df = load_history()
 
 if not history_df.empty:
     # Auto clean and format time for beautiful UI
-    history_df['time'] = history_df['time'].astype(str).str.replace('T', ' ').str[:16]
+    history_df['time'] = history_df['time'].astype(str).str.replace('T', ' ').str[:13] + ':00'
     history_df.drop_duplicates(subset=['time'], keep='last', inplace=True)
     
     history_df["correct"] = (
