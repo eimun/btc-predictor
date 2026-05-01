@@ -40,6 +40,7 @@ prices = df["close"]
 # -----------------------------
 def update_actual(prices):
     try:
+        now = datetime.utcnow()
         with open("predictions_history.jsonl", "r") as f:
             lines = f.readlines()
 
@@ -48,11 +49,14 @@ def update_actual(prices):
             record = json.loads(line)
 
             if record["actual"] is None:
-                record_time = pd.to_datetime(record["time"])
-                nearest = prices.index.get_indexer([record_time], method='nearest')[0]
-
-                if nearest + 1 < len(prices):
-                    record["actual"] = float(prices.iloc[nearest + 1])
+                row_time = pd.to_datetime(record["time"])
+                # Predictions are validated only after the forecast horizon is reached to avoid data leakage
+                if now >= row_time + pd.Timedelta(hours=1):
+                    if row_time in prices.index:
+                        record["actual"] = float(prices.loc[row_time])
+                    else:
+                        nearest = prices.index.get_indexer([row_time], method='nearest')[0]
+                        record["actual"] = float(prices.iloc[nearest])
 
             updated.append(record)
 
