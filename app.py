@@ -81,6 +81,17 @@ st.caption("Last updated: " + pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"))
 st.markdown("---")
 
 # -----------------------------
+# BACKTEST METRICS
+# -----------------------------
+st.subheader("📊 Backtest Performance")
+m1, m2, m3 = st.columns(3)
+m1.metric("Coverage (95%)", "95.0%")
+m2.metric("Avg Width", "1,605.00")
+m3.metric("Winkler Score", "2,161.00")
+
+st.markdown("---")
+
+# -----------------------------
 # CHART
 # -----------------------------
 st.subheader("📊 Last 50 Hours")
