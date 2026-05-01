@@ -157,10 +157,33 @@ st.markdown("---")
 # BACKTEST METRICS
 # -----------------------------
 st.subheader("📊 Backtest Performance")
-m1, m2, m3 = st.columns(3)
-m1.metric("Coverage (95%)", "95.0%")
-m2.metric("Avg Width", "1,605.00")
-m3.metric("Winkler Score", "2,161.00")
+
+import os
+if os.path.exists("backtest_results.jsonl"):
+    with open("backtest_results.jsonl", "r") as f:
+        bt_rows = [json.loads(line) for line in f if line.strip()]
+    
+    bt_cov = np.mean([r['low'] <= r['actual'] <= r['high'] for r in bt_rows])
+    bt_widths = [r['high'] - r['low'] for r in bt_rows]
+    bt_winklers = []
+    for r in bt_rows:
+        w = r['high'] - r['low']
+        if r['actual'] < r['low']:
+            bt_winklers.append(w + (2/0.05)*(r['low'] - r['actual']))
+        elif r['actual'] > r['high']:
+            bt_winklers.append(w + (2/0.05)*(r['actual'] - r['high']))
+        else:
+            bt_winklers.append(w)
+    
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Coverage (95%)", f"{bt_cov:.1%}")
+    m2.metric("Avg Width", f"{np.mean(bt_widths):,.2f}")
+    m3.metric("Winkler Score", f"{np.mean(bt_winklers):,.2f}")
+else:
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Coverage (95%)", "N/A")
+    m2.metric("Avg Width", "N/A")
+    m3.metric("Winkler Score", "N/A")
 
 st.markdown("---")
 
