@@ -64,8 +64,20 @@ def update_actual(prices):
         pass
 
 def save_prediction(low, high, S0):
+    current_hour = datetime.utcnow().replace(minute=0, second=0, microsecond=0).isoformat()
+    
+    # Duplicate check for the current hour
+    try:
+        with open("predictions_history.jsonl", "r") as f:
+            for line in f:
+                rec = json.loads(line)
+                if rec.get("time") == current_hour:
+                    return  # Skip if already exists
+    except FileNotFoundError:
+        pass
+
     record = {
-        "time": datetime.utcnow().isoformat(),
+        "time": current_hour,
         "current_price": float(S0),
         "low": float(low),
         "high": float(high),
