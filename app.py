@@ -188,6 +188,10 @@ st.markdown("### 📜 Prediction History")
 history_df = load_history()
 
 if not history_df.empty:
+    # Auto clean and format time for beautiful UI
+    history_df['time'] = pd.to_datetime(history_df['time']).dt.strftime('%Y-%m-%d %H:%M')
+    history_df.drop_duplicates(subset=['time'], keep='last', inplace=True)
+    
     history_df["correct"] = (
         (history_df["actual"] >= history_df["low"]) &
         (history_df["actual"] <= history_df["high"])
