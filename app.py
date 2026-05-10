@@ -4,13 +4,37 @@ import numpy as np
 import requests
 from arch import arch_model
 import scipy.stats as stats
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 import json
 from datetime import datetime
 
-st.set_page_config(page_title="BTC Predictor", layout="wide")
+st.set_page_config(page_title="BTC Predictor", page_icon="₿", layout="wide")
 
-st.title("🚀 Bitcoin Next Hour Prediction")
+st.markdown("""
+<style>
+    .reportview-container {
+        background: #0e1117;
+    }
+    h1 {
+        color: #f2a900;
+        text-align: center;
+        font-family: 'Inter', sans-serif;
+    }
+    div[data-testid="metric-container"] {
+        background-color: #1e2130;
+        border: 1px solid #2e3246;
+        padding: 5% 5% 5% 10%;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    hr {
+        border-color: #2e3246;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+st.title("₿ Bitcoin Next Hour Prediction Dashboard")
+st.markdown("<p style='text-align: center; color: #a0aab4; font-size: 1.2rem;'>Advanced volatility forecasting using GBM + FIGARCH + Student-t distribution.</p>", unsafe_allow_html=True)
 
 # -----------------------------
 # DATA FETCH
@@ -152,94 +176,142 @@ save_prediction(low, high, S0)
 # -----------------------------
 # UI
 # -----------------------------
+st.markdown("### 🎯 Live Prediction")
 col1, col2, col3 = st.columns(3)
 
-col1.metric("💰 Current BTC", f"${S0:,.2f}", delta="Live")
-col2.metric("📉 Predicted Low", f"${low:,.2f}", delta=f"{low - S0:.2f}")
-col3.metric("📈 Predicted High", f"${high:,.2f}", delta=f"{high - S0:.2f}")
+col1.metric("💰 Current BTC Price", f"${S0:,.2f}", delta="Live")
+col2.metric("📉 Predicted Low (95% CI)", f"${low:,.2f}", delta=f"{low - S0:.2f}", delta_color="normal")
+col3.metric("📈 Predicted High (95% CI)", f"${high:,.2f}", delta=f"{high - S0:.2f}", delta_color="normal")
 
-st.markdown(f"### 🟢 Next hour BTC range: \${low:,.0f} – \${high:,.0f}")
-st.caption("Model: GBM + FIGARCH + Student-t | 95% Confidence Interval")
-st.caption("Last updated: " + pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"))
-
-st.markdown("---")
-
-# -----------------------------
-# BACKTEST METRICS
-# -----------------------------
-st.subheader("📊 Backtest Performance")
-
-import os
-if os.path.exists("backtest_results.jsonl"):
-    with open("backtest_results.jsonl", "r") as f:
-        bt_rows = [json.loads(line) for line in f if line.strip()]
-    
-    bt_cov = np.mean([r['low'] <= r['actual'] <= r['high'] for r in bt_rows])
-    bt_widths = [r['high'] - r['low'] for r in bt_rows]
-    bt_winklers = []
-    for r in bt_rows:
-        w = r['high'] - r['low']
-        if r['actual'] < r['low']:
-            bt_winklers.append(w + (2/0.05)*(r['low'] - r['actual']))
-        elif r['actual'] > r['high']:
-            bt_winklers.append(w + (2/0.05)*(r['actual'] - r['high']))
-        else:
-            bt_winklers.append(w)
-    
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Coverage (95%)", f"{bt_cov:.1%}")
-    m2.metric("Avg Width", f"{np.mean(bt_widths):,.2f}")
-    m3.metric("Winkler Score", f"{np.mean(bt_winklers):,.2f}")
-else:
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Coverage (95%)", "N/A")
-    m2.metric("Avg Width", "N/A")
-    m3.metric("Winkler Score", "N/A")
+st.markdown(f"<h3 style='text-align: center; color: #00ff00; margin-top: 20px;'>🟢 Next hour BTC range: ${low:,.0f} – ${high:,.0f}</h3>", unsafe_allow_html=True)
+st.caption(f"<div style='text-align: center;'>Last updated: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')} UTC</div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
 # -----------------------------
 # CHART
 # -----------------------------
-st.subheader("📊 Last 50 Hours")
-
-fig, ax = plt.subplots()
+st.subheader("📊 Price Action & Prediction Bounds")
 
 last_prices = prices.tail(50)
+fig = go.Figure()
 
-ax.plot(last_prices.index, last_prices.values, label="BTC Price")
+# Add actual price line
+fig.add_trace(go.Scatter(
+    x=last_prices.index, 
+    y=last_prices.values,
+    mode='lines',
+    name='BTC Price',
+    line=dict(color='#f2a900', width=2)
+))
 
-ax.axhspan(low, high, color='orange', alpha=0.3, label="Prediction Range")
+# Add prediction area for the next hour
+last_time = last_prices.index[-1]
+next_time = last_time + pd.Timedelta(hours=1)
 
-ax.legend()
-plt.xticks(rotation=45)
+fig.add_trace(go.Scatter(
+    x=[last_time, next_time, next_time, last_time],
+    y=[S0, high, low, S0],
+    fill='toself',
+    fillcolor='rgba(0, 255, 0, 0.15)',
+    line=dict(color='rgba(0, 255, 0, 0.8)', width=1, dash='dash'),
+    name='Next Hour 95% CI Range'
+))
 
-st.pyplot(fig)
+# Update layout for premium look
+fig.update_layout(
+    template="plotly_dark",
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)',
+    margin=dict(l=0, r=0, t=20, b=0),
+    xaxis_title="",
+    yaxis_title="Price (USD)",
+    hovermode="x unified",
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="right",
+        x=1
+    )
+)
+
+st.plotly_chart(fig, use_container_width=True)
 
 st.markdown("---")
 
 # -----------------------------
-# HISTORY
+# HISTORY & BACKTEST (Side-by-Side)
 # -----------------------------
-st.markdown("### 📜 Prediction History")
+col_backtest, col_history = st.columns([1, 1.5])
 
-history_df = load_history()
+with col_backtest:
+    st.subheader("🧪 Backtest Performance")
+    st.markdown("<p style='color: #a0aab4; font-size: 0.9rem;'>Rolling 30-day evaluation of the FIGARCH model.</p>", unsafe_allow_html=True)
+    import os
+    if os.path.exists("backtest_results.jsonl"):
+        with open("backtest_results.jsonl", "r") as f:
+            bt_rows = [json.loads(line) for line in f if line.strip()]
+        
+        bt_cov = np.mean([r['low'] <= r['actual'] <= r['high'] for r in bt_rows])
+        bt_widths = [r['high'] - r['low'] for r in bt_rows]
+        bt_winklers = []
+        for r in bt_rows:
+            w = r['high'] - r['low']
+            if r['actual'] < r['low']:
+                bt_winklers.append(w + (2/0.05)*(r['low'] - r['actual']))
+            elif r['actual'] > r['high']:
+                bt_winklers.append(w + (2/0.05)*(r['actual'] - r['high']))
+            else:
+                bt_winklers.append(w)
+        
+        st.metric("Coverage (95% Target)", f"{bt_cov:.1%}")
+        st.metric("Average Width", f"${np.mean(bt_widths):,.2f}")
+        st.metric("Winkler Score", f"{np.mean(bt_winklers):,.2f}")
+    else:
+        st.metric("Coverage (95% Target)", "N/A")
+        st.metric("Average Width", "N/A")
+        st.metric("Winkler Score", "N/A")
 
-if not history_df.empty:
-    # Auto clean and format time for beautiful UI
-    history_df['time'] = history_df['time'].astype(str).str.replace('T', ' ').str[:13] + ':00'
-    history_df.drop_duplicates(subset=['time'], keep='last', inplace=True)
+with col_history:
+    st.subheader("📜 Recent Predictions")
     
-    def get_status(row):
-        if pd.isna(row['actual']):
-            return '⏳'
-        elif row['low'] <= row['actual'] <= row['high']:
-            return '✔️'
-        else:
-            return '❌'
-
-    history_df['Status'] = history_df.apply(get_status, axis=1)
-    history_df = history_df.drop(columns=["correct"], errors="ignore")
-    st.dataframe(history_df.tail(10))
-else:
-    st.info("No predictions yet")
+    history_df = load_history()
+    
+    if not history_df.empty:
+        # Auto clean and format time for beautiful UI
+        history_df['time'] = history_df['time'].astype(str).str.replace('T', ' ').str[:13] + ':00'
+        history_df.drop_duplicates(subset=['time'], keep='last', inplace=True)
+        
+        def get_status(row):
+            if pd.isna(row['actual']):
+                return '⏳ Pending'
+            elif row['low'] <= row['actual'] <= row['high']:
+                return '✅ Hit'
+            else:
+                return '❌ Miss'
+    
+        history_df['Status'] = history_df.apply(get_status, axis=1)
+        history_df = history_df.drop(columns=["correct"], errors="ignore")
+        
+        display_df = history_df.tail(10).copy()
+        display_df.rename(columns={
+            'time': 'Time (UTC)',
+            'current_price': 'Start Price',
+            'low': 'Pred Low',
+            'high': 'Pred High',
+            'actual': 'Actual Price'
+        }, inplace=True)
+        
+        st.dataframe(
+            display_df.set_index('Time (UTC)'),
+            use_container_width=True,
+            column_config={
+                "Start Price": st.column_config.NumberColumn(format="$%.2f"),
+                "Pred Low": st.column_config.NumberColumn(format="$%.2f"),
+                "Pred High": st.column_config.NumberColumn(format="$%.2f"),
+                "Actual Price": st.column_config.NumberColumn(format="$%.2f"),
+            }
+        )
+    else:
+        st.info("No predictions yet")
